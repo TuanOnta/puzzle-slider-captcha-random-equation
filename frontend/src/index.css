@@ -1,0 +1,9 @@
+@import "tailwindcss"; 
+
+@layer utilities {
+  .slider-thumb-hidden::-webkit-slider-thumb {
+    appearance: none;
+    width: 0;
+    height: 0;
+  }
+}

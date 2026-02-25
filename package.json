@@ -1,0 +1,18 @@
+{
+  "name": "puzzle-slider-captcha-random-equation",
+  "version": "1.0.0",
+  "description": "A research-oriented implementation of a puzzle slider CAPTCHA system enhanced with non-linear trajectory mapping using deterministic random equations (LCG-based) to improve resistance against automated bot attacks.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
