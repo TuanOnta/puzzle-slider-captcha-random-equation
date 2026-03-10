@@ -1,8 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { ConventionalEngine } from "./engines/conventional";
+import { equationEngine } from "./engines/equation";
 import { verifyCaptcha } from "./verify";
-import { CaptchaEngine, CaptchaTrajectoryData, Challenge } from "./engines/captcha-engine";
+import { CaptchaEngine, CaptchaTrajectoryData, Challenge, EquationChallenge } from "./engines/captcha-engine";
 
 const fastify = Fastify({
   logger: {
@@ -15,6 +16,7 @@ const fastify = Fastify({
 fastify.register(cors, { origin: "http://localhost:5173" });
 
 const conventionalEngine = new ConventionalEngine();
+const eqEngine = new equationEngine();
 
 interface ServerChallenge {
   engine: CaptchaEngine;
@@ -28,7 +30,7 @@ fastify.get("/challenge", async (request) => {
   const seed = Date.now();
   const { mode } = request.query as { mode: "conventional" | "equation" };
 
-  const engine: CaptchaEngine = conventionalEngine; // equation mode: extend here
+  const engine: CaptchaEngine = mode === "equation" ? eqEngine : conventionalEngine;
 
   const engineChallenge = await engine.generate(seed, request.log) as Challenge;
 
@@ -46,6 +48,9 @@ fastify.get("/challenge", async (request) => {
     background: engineChallenge.backgroundBuffer.toString("base64"),
     piece: engineChallenge.pieceBuffer.toString("base64"),
     pieceY: engineChallenge.initialY,
+    ...(mode === "equation" && {
+      equationParams: (engineChallenge as EquationChallenge).equationParams,
+    }),
   };
 });
 

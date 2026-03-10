@@ -1,12 +1,34 @@
 import React, { useEffect, useRef, useState } from "react";
 import { fetchChallenge, verifyCaptcha } from "../services/api";
-import type { ChallengeResponse, CaptchaTrajectoryData, TrajectoryPoint } from "../types/captcha";
+import type { ChallengeResponse, CaptchaTrajectoryData, TrajectoryPoint, EquationParams } from "../types/captcha";
 
 export const CANVAS_WIDTH = 320;
 export const PUZZLE_WIDTH = 60;
 export const HANDLE_WIDTH = 48;
 export const MAX_TRAVEL = CANVAS_WIDTH - PUZZLE_WIDTH;       // 260px
 export const SLIDER_MAX_TRAVEL = CANVAS_WIDTH - HANDLE_WIDTH; // 272px
+
+// Must mirror backend constants from image-generator.ts
+const OUTPUT_WIDTH = 320;
+const OUTPUT_HEIGHT = 200;
+const PIECE_SIZE = 50;
+const BUFFER_PADDING = 15;
+
+function computeEquationPos(t: number, params: EquationParams) {
+  const j = params.x1 * t * t + params.x2 * t + params.x3;
+  const x = Math.max(0, Math.min(j, OUTPUT_WIDTH - PIECE_SIZE));
+  const yCenter = (OUTPUT_HEIGHT - PIECE_SIZE) / 2;
+  const y = Math.max(0, Math.min(
+    yCenter + params.yAmplitude * Math.sin(j * params.yFrequency),
+    OUTPUT_HEIGHT - PIECE_SIZE
+  ));
+  const theta = params.rotationFactor * Math.sin(j * params.yFrequency);
+  return {
+    x: Math.max(0, x - BUFFER_PADDING),
+    y: Math.max(0, y - BUFFER_PADDING),
+    theta,
+  };
+}
 
 function getCoords(e: React.MouseEvent | React.TouchEvent) {
   if ("touches" in e) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -95,8 +117,17 @@ export function useCaptcha() {
     }
   }
 
+  const eqPos = (mode === "equation" && challenge?.equationParams)
+    ? computeEquationPos(sliderValue, challenge.equationParams)
+    : null;
+
+  const pieceX      = eqPos?.x     ?? sliderValue;
+  const pieceCurrentY = eqPos?.y   ?? (challenge?.pieceY ?? 0);
+  const pieceTheta  = eqPos?.theta ?? 0;
+
   return {
     mode, setMode, challenge, sliderValue, result, isLoading, isVerifying,
     loadChallenge, onSliderChange, onPointerDown, onPointerMove, onPointerUp,
+    pieceX, pieceCurrentY, pieceTheta,
   };
 }

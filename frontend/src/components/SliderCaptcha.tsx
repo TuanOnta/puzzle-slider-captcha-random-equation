@@ -4,6 +4,7 @@ export default function SliderCaptcha() {
   const {
     mode, setMode, challenge, sliderValue, result, isLoading, isVerifying,
     loadChallenge, onSliderChange, onPointerDown, onPointerMove, onPointerUp,
+    pieceX, pieceCurrentY, pieceTheta,
   } = useCaptcha();
 
   const handleFill = `calc(${(sliderValue / MAX_TRAVEL) * SLIDER_MAX_TRAVEL}px + ${HANDLE_WIDTH}px)`;
@@ -23,7 +24,9 @@ export default function SliderCaptcha() {
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900">Security Check</h3>
-              <p className="text-xs text-slate-500">Complete the puzzle</p>
+              <p className="text-xs text-slate-500">
+                {mode === "equation" ? "Solve the equation path" : "Complete the puzzle"}
+              </p>
             </div>
           </div>
           <button
@@ -70,7 +73,7 @@ export default function SliderCaptcha() {
                 <img
                   src={`data:image/png;base64,${challenge.piece}`}
                   alt="Piece"
-                  style={{ left: `${sliderValue}px`, top: `${challenge.pieceY}px` }}
+                  style={{ left: `${pieceX}px`, top: `${pieceCurrentY}px`, transform: `rotate(${pieceTheta}deg)` }}
                   className="absolute z-10 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] pointer-events-none will-change-transform"
                 />
               </div>

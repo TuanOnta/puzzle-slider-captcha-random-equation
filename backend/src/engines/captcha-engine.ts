@@ -12,10 +12,21 @@ export interface ConventionalChallenge extends Challenge {
   tolerance: number;
 }
 
+export interface EquationParams {
+  x1: number;
+  x2: number;
+  x3: number;
+  yAmplitude: number;
+  yFrequency: number;
+  rotationFactor: number;
+}
+
 export interface EquationChallenge extends Challenge {
   targetX: number;
   targetY: number;
+  targetT: number;
   tolerance: number;
+  equationParams: EquationParams;
 }
 
 export interface TrajectoryPoint {
