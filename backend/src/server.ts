@@ -1,121 +1,70 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { ConventionalEngine } from "./engines/conventional";
-import { generateChallenge } from "./challenge";
 import { verifyCaptcha } from "./verify";
-import { CaptchaEngine, ConventionalChallenge } from "./engines/captcha-engine";
+import { CaptchaEngine, CaptchaTrajectoryData, Challenge } from "./engines/captcha-engine";
 
 const fastify = Fastify({
   logger: {
     transport: {
-      target: 'pino-pretty',  
-      options: {
-        translateTime: 'SYS:HH:MM:ss Z',
-        ignore: 'pid,hostname'           
-      }
+      target: 'pino-pretty',
+      options: { translateTime: 'SYS:HH:MM:ss Z', ignore: 'pid,hostname' }
     }
   }
-})
-fastify.register(cors, {origin: "http://localhost:5173"})
+});
+fastify.register(cors, { origin: "http://localhost:5173" });
 
-const Conventionalengine = new ConventionalEngine();
-const EquationEngine = null; // Placeholder for future implementation
+const conventionalEngine = new ConventionalEngine();
 
 interface ServerChallenge {
-  id: string;
-  mode: "conventional" | "equation";
   engine: CaptchaEngine;
-  seed: number;
-  equationParams?: any;
-  canvasWidth: number;
-  notch: { x: number; y: number };
-  targetX: number;
-  createdAt: number;
+  challenge: Challenge;
   expiresAt: number;
-  tolerance: number;
-  engineChallenge: ConventionalChallenge;
 }
 
 const activeChallenges = new Map<string, ServerChallenge>();
 
-fastify.get("/challenge", async (request, reply) => {
+fastify.get("/challenge", async (request) => {
   const seed = Date.now();
-  const query = request.query as { mode: "conventional" | "equation" };
+  const { mode } = request.query as { mode: "conventional" | "equation" };
 
-  let inputEngine: CaptchaEngine = Conventionalengine;
-  if (query.mode == "conventional") {
-    inputEngine = Conventionalengine;
-  }else if (query.mode == "equation") {
-    // inputEngine = EquationEngine;
-  }
+  const engine: CaptchaEngine = conventionalEngine; // equation mode: extend here
 
-  // Generate challenge using the engine
-  const engineChallenge = await generateChallenge(inputEngine, seed, request.log) as ConventionalChallenge;
+  const engineChallenge = await engine.generate(seed, request.log) as Challenge;
 
-  const challenge: ServerChallenge = {
-    id: engineChallenge.id,
-    mode: query.mode,
-    engine: inputEngine,
-    seed,
-    canvasWidth: engineChallenge.canvasWidth,
-    notch: { x: engineChallenge.targetX, y: engineChallenge.targetY },
-    targetX: engineChallenge.targetX,
-    tolerance: engineChallenge.tolerance,
-    createdAt: Date.now(),
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
-    engineChallenge
-  };
+  activeChallenges.set(engineChallenge.id, {
+    engine,
+    challenge: engineChallenge,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
 
-  request.log.info(`Generated challenge ${challenge.id} with seed ${seed} in mode ${challenge.mode}`);
-
-  activeChallenges.set(challenge.id, challenge);
-
-  request.log.info(`Active challenges count: ${activeChallenges.size}`);
+  request.log.info(`Challenge ${engineChallenge.id} generated [mode=${mode}, seed=${seed}] — active: ${activeChallenges.size}`);
 
   return {
-    id: challenge.id,
-    canvasWidth: challenge.canvasWidth,
+    id: engineChallenge.id,
+    canvasWidth: engineChallenge.canvasWidth,
     background: engineChallenge.backgroundBuffer.toString("base64"),
     piece: engineChallenge.pieceBuffer.toString("base64"),
-    pieceY: engineChallenge.targetY
+    pieceY: engineChallenge.initialY,
   };
 });
 
 fastify.post("/verify", async (request, reply) => {
-  const body = request.body as {
+  const { id, userX, trajectoryData } = request.body as {
     id: string;
     userX: number;
-    trajectory?: { x: number; t: number }[];
+    trajectoryData?: CaptchaTrajectoryData;
   };
 
-  const challenge = activeChallenges.get(body.id);
+  const entry = activeChallenges.get(id);
+  if (!entry) return reply.status(400).send({ success: false, message: "Invalid or expired challenge" });
 
-  if (!challenge) {
-    return reply.status(400).send({
-      success: false,
-      message: "Invalid or expired challenge"
-    });
-  }
+  activeChallenges.delete(id);
 
-  
+  const result = verifyCaptcha(entry.engine, entry.challenge, userX, trajectoryData, request.log);
+  request.log.info(`Challenge ${id} result: ${result}`);
 
-  request.log.info(`Verifying challenge ${body.id} with userX: ${body.userX}`);
-
-  const result = verifyCaptcha(
-    challenge.engine,
-    challenge.engineChallenge,
-    body.userX,
-    body.trajectory,
-    request.log
-  );
-
-  activeChallenges.delete(body.id);
-
-  request.log.info(`Verification result for challenge ${body.id}: ${result}`);
-
-  return {
-    success: result
-  };
+  return { success: result };
 });
 
 fastify.listen({ port: 3000 }, (err) => {

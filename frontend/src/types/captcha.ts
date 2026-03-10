@@ -11,5 +11,12 @@ export interface VerifyResponse {
 
 export interface TrajectoryPoint {
   x: number;
+  y: number;
   t: number;
+}
+
+export interface CaptchaTrajectoryData {
+  mouseDown: TrajectoryPoint;
+  mouseUp: TrajectoryPoint;
+  trajectory: TrajectoryPoint[];
 }

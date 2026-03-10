@@ -1,4 +1,4 @@
-// equation.ts
+import { CaptchaEngine, EquationChallenge, VerificationInput } from "./captcha-engine";
 
 export interface EquationParams {
   x1: number; // quadratic coefficient
@@ -15,76 +15,86 @@ export interface EquationOutput {
   theta: number;
 }
 
-function mulberry32(seed: number) {
-  return function () {
-    let t = seed += 0x6D2B79F5;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+export class equationEngine implements CaptchaEngine {
+  async generate(seed: number, logger?: any): Promise<EquationChallenge>  {
+    return null as any; // Placeholder for future implementation
+  }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
+  verify(input: VerificationInput, logger?: any): boolean {
+      return false; // Placeholder for future implementation
+  }
 
-/**
- * Generate deterministic equation parameters from seed
- */
-export function generateParams(seed: number): EquationParams {
-  const rand = mulberry32(seed);
+  private mulberry32(seed: number) {
+    return function() {
+      let t = seed += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+  }
 
-  return {
-    x1: rand() * 0.0015,            // small quadratic term
-    x2: 1 + rand() * 0.2,           // near linear
-    x3: rand() * 5,                 // small offset
-    yAmplitude: 10 + rand() * 10,   // vertical amplitude (10–20)
-    yFrequency: 0.01 + rand() * 0.02,
-    rotationFactor: 2 + rand() * 4  // 2–6 degrees influence
-  };
-}
+  private clamp(value: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, value));
+  }
 
-/**
- * Main compute function
- */
-export function computeEquation(
-  t: number,
-  params: EquationParams,
-  canvasWidth: number,
-  canvasHeight: number,
-  pieceSize: number
-): EquationOutput {
+  /**
+   * Generate deterministic equation parameters from seed
+   */
+  private generateParams(seed: number): EquationParams {
+    const rand = this.mulberry32(seed);
 
-  // --- 1. Abscissa mapping
-  const j =
-    params.x1 * t * t +
-    params.x2 * t +
-    params.x3;
+    return {
+      x1: rand() * 0.0015,            // small quadratic term
+      x2: 1 + rand() * 0.2,           // near linear
+      x3: rand() * 5,                 // small offset
+      yAmplitude: 10 + rand() * 10,   // vertical amplitude (10–20)
+      yFrequency: 0.01 + rand() * 0.02,
+      rotationFactor: 2 + rand() * 4  // 2–6 degrees influence
+    };
+  }
 
-  // --- 2. Horizontal offset
-  let x = j;
+  /**
+   * Main compute function
+   */
+  private computeEquation(
+    t: number,
+    params: EquationParams,
+    canvasWidth: number,
+    canvasHeight: number,
+    pieceSize: number
+  ): EquationOutput {
 
-  // Clamp horizontal
-  x = clamp(x, 0, canvasWidth - pieceSize);
+    // --- 1. Abscissa mapping
+    const j =
+      params.x1 * t * t +
+      params.x2 * t +
+      params.x3;
 
-  // --- 3. Vertical correction
-  const yCenter = (canvasHeight - pieceSize) / 2;
-  const y =
-    yCenter +
-    params.yAmplitude *
+    // --- 2. Horizontal offset
+    let x = j;
+
+    // Clamp horizontal
+    x = this.clamp(x, 0, canvasWidth - pieceSize);
+
+    // --- 3. Vertical correction
+    const yCenter = (canvasHeight - pieceSize) / 2;
+    const y =
+      yCenter +
+      params.yAmplitude *
+        Math.sin(j * params.yFrequency);
+
+    // Clamp vertical
+    const clampedY = this.clamp(y, 0, canvasHeight - pieceSize);
+
+    // --- 4. Rotation
+    const theta =
+      params.rotationFactor *
       Math.sin(j * params.yFrequency);
 
-  // Clamp vertical
-  const clampedY = clamp(y, 0, canvasHeight - pieceSize);
-
-  // --- 4. Rotation
-  const theta =
-    params.rotationFactor *
-    Math.sin(j * params.yFrequency);
-
-  return {
-    x,
-    y: clampedY,
-    theta
-  };
+    return {
+      x,
+      y: clampedY,
+      theta
+    };
+  }
 }
